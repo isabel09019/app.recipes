@@ -5,35 +5,43 @@ import SwiftData
 final class Receita {
     @Attribute(.unique) var id: String
     var titulo: String
-    var imagemURL: String
-    var tempoPreparo: Int
-    var calorias: Int
+    var descricao: String
+    var informacaoNutricional: String
+    var imagemURL: String?
+    var tempoPreparo: Int?
+    var porcoes: Int?
+    var calorias: Int?
     var ingredientes: [String]
     var passosPreparo: [String]
     var isSalvo: Bool
-    
-    var categoria: Categoria?
-    
+
+    var categorias: [Categoria] = []
+
     init(
         id: String,
         titulo: String,
-        imagemURL: String,
-        tempoPreparo: Int,
-        calorias: Int,
-        ingredientes: [String],
-        passosPreparo: [String],
+        descricao: String = "",
+        informacaoNutricional: String = "",
+        imagemURL: String? = nil,
+        tempoPreparo: Int? = nil,
+        porcoes: Int? = nil,
+        calorias: Int? = nil,
+        ingredientes: [String] = [],
+        passosPreparo: [String] = [],
         isSalvo: Bool = false,
-        categoria: Categoria? = nil
+        categorias: [Categoria] = []
     ) {
         self.id = id
         self.titulo = titulo
+        self.descricao = descricao
+        self.informacaoNutricional = informacaoNutricional
         self.imagemURL = imagemURL
         self.tempoPreparo = tempoPreparo
+        self.porcoes = porcoes
         self.calorias = calorias
         self.ingredientes = ingredientes
         self.passosPreparo = passosPreparo
         self.isSalvo = isSalvo
-        self.categoria = categoria
+        self.categorias = categorias
     }
 }
-
