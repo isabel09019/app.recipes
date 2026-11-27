@@ -1,6 +1,6 @@
 import SwiftUI
 
-// MARK: - Modelos e Dados
+
 struct Recipe: Identifiable, Hashable {
     let id: String
     let name: String
@@ -15,98 +15,50 @@ struct Recipe: Identifiable, Hashable {
     func matches(_ query: String) -> Bool {
         let words = query.split(whereSeparator: { $0.isWhitespace })
         if words.isEmpty { return true }
+
         let searchableText = ([name, subtitle] + ingredients).joined(separator: " ")
-        return words.allSatisfy { searchableText.localizedStandardContains(String($0)) }
+
+        return words.allSatisfy {
+            searchableText.localizedStandardContains(String($0))
+        }
     }
 }
 
+
 enum SampleRecipes {
-    static let all: [Recipe] = [
-        Recipe(
-            id: "pao-com-ovo",
-            name: "Pão com ovo",
-            subtitle: "Café da manhã",
-            minutes: 10,
-            servings: 1,
-            ingredients: [
-                "1 fatia de pão integral",
-                "1 ovo",
-                "1 colher de chá de azeite",
-                "Sal e pimenta a gosto"
-            ],
-            steps: [
-                "Toste o pão integral dos dois lados até ficar crocante.",
-                "Aqueça o azeite na frigideira. Quebre o ovo e cozinhe até a clara e a gema firmarem.",
-                "Coloque o ovo sobre o pão e finalize com sal e pimenta."
-            ],
-            icon: "frying.pan",
-            photoAsset: "PaoComOvo"
-        ),
-        Recipe(
-            id: "iogurte-com-banana",
-            name: "Iogurte com banana",
-            subtitle: "Lanche",
-            minutes: 5,
-            servings: 1,
-            ingredients: [
-                "1 pote de iogurte natural",
-                "1 banana",
-                "2 colheres de sopa de aveia"
-            ],
-            steps: [
-                "Corte a banana em rodelas.",
-                "Coloque o iogurte em uma tigela e sirva com a banana e a aveia."
-            ],
-            icon: "carrot"
-        ),
-        Recipe(
-            id: "salada-de-grao-de-bico",
-            name: "Salada de grão-de-bico",
-            subtitle: "Almoço",
-            minutes: 15,
-            servings: 2,
-            ingredients: [
-                "1 xícara de grão-de-bico cozido",
-                "1 tomate",
-                "½ pepino",
-                "Azeite e limão a gosto"
-            ],
-            steps: [
-                "Pique o tomate e o pepino.",
-                "Misture com o grão-de-bico e tempere com azeite e limão."
-            ],
-            icon: "leaf"
-        )
-    ]
+    static let all: [Recipe] = []
 }
 
-// MARK: - Paleta de Cores
+
 private enum Palette {
-    static let background = Color(red: 0.93, green: 0.96, blue: 0.88)
-    static let paper = Color(red: 1, green: 0.99, blue: 0.96)
-    static let orange = Color(red: 0.72, green: 0.24, blue: 0.08)
-    static let paleOrange = Color(red: 1, green: 0.91, blue: 0.83)
-    static let ink = Color(red: 0.15, green: 0.20, blue: 0.12)
-    static let muted = Color(red: 0.34, green: 0.39, blue: 0.29)
+    static let background = Color.white
+    static let paper = Color(red: 0.95, green: 0.95, blue: 0.97)
+    static let orange = Color(red: 1.0, green: 0.53, blue: 0.12)
+    static let paleOrange = Color(red: 1.0, green: 0.93, blue: 0.87)
+    static let ink = Color.black
+    static let muted = Color.gray
 }
 
-// MARK: - Gerenciador de Favoritos
+
 private enum FavoriteRecipes {
     static func decode(_ raw: String) -> Set<String> {
         guard let data = raw.data(using: .utf8),
               let array = try? JSONDecoder().decode([String].self, from: data) else {
             return []
         }
+
         return Set(array)
     }
 
     static func toggle(_ id: String, in raw: inout String) {
         var current = decode(raw)
+
         if current.contains(id) {
             current.remove(id)
         } else {
             current.insert(id)
         }
+
         if let data = try? JSONEncoder().encode(Array(current)),
            let encoded = String(data: data, encoding: .utf8) {
             raw = encoded
@@ -114,166 +66,226 @@ private enum FavoriteRecipes {
     }
 }
 
-// MARK: - Tela Principal (Abas)
-struct RecipeHome: View {
-    private let recipes = SampleRecipes.all
-    @State private var query = ""
-    @AppStorage("recipe.favoriteIDs") private var storedFavorites = "[]"
 
-    private var isSearching: Bool {
-        !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+struct RecipeHome: View {
+
+    @State private var selectedTab = 0
+    @State private var selectedCategory: String? = nil
+    @State private var searchText = ""
+
+    @AppStorage("recipe.favoriteIDs")
+    private var storedFavorites = "[]"
+
+    private let recipes = SampleRecipes.all
+
+    private let categories = [
+        "Café da manhã",
+        "Almoço",
+        "Lanche",
+        "Jantar",
+        "Sobremesa",
+        "Vegana",
+        "Vegetariana"
+    ]
+
+    private var filteredRecipes: [Recipe] {
+        recipes.filter { recipe in
+            let matchesCategory = selectedCategory == nil || recipe.subtitle == selectedCategory
+            let matchesQuery = recipe.matches(searchText)
+            return matchesCategory && matchesQuery
+        }
     }
 
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             NavigationStack {
-                searchScreen
-                    .toolbar(.hidden, for: .navigationBar)
+                catalogScreen
             }
-            .tabItem { Label("Pesquisa", systemImage: "magnifyingglass") }
+            .tabItem {
+                Label("Catálogo", systemImage: "book.closed.fill")
+            }
+            .tag(0)
 
             NavigationStack {
                 favoritesScreen
-                    .toolbar(.hidden, for: .navigationBar)
             }
-            .tabItem { Label("Favoritos", systemImage: "heart") }
+            .tabItem {
+                Label("Favoritos", systemImage: "heart.fill")
+            }
+            .tag(1)
         }
         .tint(Palette.orange)
     }
 
-    // MARK: Tela de Pesquisa
-    private var searchScreen: some View {
-        let results = recipes.filter { $0.matches(query) }
 
-        return ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                Text("Recipe")
-                    .font(.system(.largeTitle, design: .serif).weight(.bold))
-                    .foregroundStyle(Palette.orange)
+    private var catalogScreen: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 0) {
 
-                HStack(spacing: 12) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundStyle(Palette.orange)
-                    TextField("Receita ou ingrediente", text: $query)
-                        .submitLabel(.search)
-                    if !query.isEmpty {
-                        Button { query = "" } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(Palette.muted)
+                Text("Categorias")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(Palette.ink)
+                    .padding(.top, 12)
+
+               
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(categories, id: \.self) { category in
+                            let isSelected = selectedCategory == category
+
+                            Button {
+                                withAnimation(.snappy) {
+                                    selectedCategory = isSelected ? nil : category
+                                }
+                            } label: {
+                                Text(category)
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(isSelected ? .white : Palette.orange)
+                                    .padding(.horizontal, 18)
+                                    .padding(.vertical, 11)
+                                    .background(
+                                        isSelected ? Palette.orange : Palette.paleOrange,
+                                        in: Capsule()
+                                    )
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
-                .frame(minHeight: 52)
-                .padding(.horizontal, 14)
-                .background(Palette.paper, in: RoundedRectangle(cornerRadius: 14))
+                .scrollClipDisabled()
+                .padding(.top, 14)
 
-                Text(isSearching ? "Resultados" : "Receitas")
-                    .font(.system(.title2, design: .serif).weight(.semibold))
+                Text(selectedCategory ?? "Receitas")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(Palette.ink)
+                    .padding(.top, 28)
 
-                if results.isEmpty {
+                if filteredRecipes.isEmpty {
+                    let isSearching = !searchText.trimmingCharacters(in: .whitespaces).isEmpty
+
                     emptyState(
-                        "Nenhuma receita encontrada",
-                        "Tente buscar outro nome ou ingrediente.",
-                        icon: "magnifyingglass"
+                        title: isSearching ? "Nenhum resultado encontrado" : "Nenhuma receita cadastrada",
+                        message: isSearching
+                            ? "Tente buscar por outro nome ou ingrediente."
+                            : "As receitas aparecerão aqui quando forem adicionadas.",
+                        icon: isSearching ? "magnifyingglass" : "book.closed"
                     )
+                    .padding(.top, 16)
                 } else {
-                    ForEach(results) { recipe in
-                        recipeLink(recipe, featured: !isSearching && recipe.id == recipes.first?.id)
+                    ForEach(filteredRecipes) { recipe in
+                        recipeCard(recipe)
+                            .padding(.top, 16)
                     }
                 }
             }
-            .padding(22)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 30)
         }
-        .scrollDismissesKeyboard(.interactively)
-        .foregroundStyle(Palette.ink)
-        .background(Palette.background.ignoresSafeArea())
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Palette.background)
+        .navigationTitle("Catálogo")
+        .searchable(
+            text: $searchText,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: "Buscar receitas ou ingredientes"
+        )
     }
 
-    // MARK: Tela de Favoritos
+ 
     private var favoritesScreen: some View {
         let ids = FavoriteRecipes.decode(storedFavorites)
         let favorites = recipes.filter { ids.contains($0.id) }
 
-        return ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                Text("Favoritos")
-                    .font(.system(.largeTitle, design: .serif).weight(.bold))
-                    .foregroundStyle(Palette.orange)
+        return ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 0) {
 
                 if favorites.isEmpty {
                     emptyState(
-                        "Nenhuma receita salva",
-                        "Toque no coração de uma receita para encontrá-la aqui.",
+                        title: "Nenhum favorito salvo",
+                        message: "Suas receitas favoritas aparecerão aqui.",
                         icon: "heart"
                     )
+                    .padding(.top, 16)
                 } else {
                     ForEach(favorites) { recipe in
-                        recipeLink(recipe)
+                        recipeCard(recipe)
+                            .padding(.top, 16)
                     }
                 }
             }
-            .padding(22)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 30)
         }
-        .foregroundStyle(Palette.ink)
-        .background(Palette.background.ignoresSafeArea())
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Palette.background)
+        .navigationTitle("Favoritos")
     }
 
-    // MARK: Componentes Visuais
-    private func recipeLink(_ recipe: Recipe, featured: Bool = false) -> some View {
-        NavigationLink {
-            RecipeDetail(recipe: recipe, storedFavorites: $storedFavorites)
-        } label: {
-            if featured {
-                VStack(spacing: 0) {
-                    RecipePhoto(recipe: recipe, height: 192)
-                    recipeCaption(recipe)
-                        .padding(16)
-                }
-                .background(Palette.paper, in: RoundedRectangle(cornerRadius: 18))
-                .clipShape(RoundedRectangle(cornerRadius: 18))
-            } else {
-                HStack(spacing: 14) {
-                    Image(systemName: recipe.icon)
-                        .font(.title2)
-                        .foregroundStyle(Palette.orange)
-                        .frame(width: 52, height: 52)
-                        .background(Palette.paleOrange, in: RoundedRectangle(cornerRadius: 12))
+    
+    private func recipeCard(_ recipe: Recipe) -> some View {
+        HStack(spacing: 15) {
+            Image(systemName: recipe.icon)
+                .font(.system(size: 24))
+                .foregroundStyle(Palette.orange)
+                .frame(width: 60, height: 60)
+                .background(
+                    Palette.paleOrange,
+                    in: RoundedRectangle(cornerRadius: 16)
+                )
 
-                    recipeCaption(recipe)
-                }
-                .padding(14)
-                .background(Palette.paper, in: RoundedRectangle(cornerRadius: 16))
-            }
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func recipeCaption(_ recipe: Recipe) -> some View {
-        HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text(recipe.subtitle.uppercased())
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Palette.orange)
                 Text(recipe.name)
-                    .font(.system(.headline, design: .serif))
+                    .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(Palette.ink)
-                Text("\(recipe.minutes) min • \(recipe.servings) \(recipe.servings == 1 ? "porção" : "porções")")
-                    .font(.subheadline)
+
+                Text("\(recipe.subtitle) • \(recipe.minutes) min")
+                    .font(.system(size: 15))
                     .foregroundStyle(Palette.muted)
             }
+
             Spacer()
+
             Image(systemName: "chevron.right")
-                .font(.footnote.weight(.semibold))
+                .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(Palette.muted)
         }
+        .padding(16)
+        .background(
+            Palette.paper,
+            in: RoundedRectangle(cornerRadius: 22)
+        )
     }
 
-    private func emptyState(_ title: String, _ message: String, icon: String) -> some View {
+    
+    private func emptyState(
+        title: String,
+        message: String,
+        icon: String
+    ) -> some View {
         VStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.largeTitle)
+                .font(.system(size: 32))
                 .foregroundStyle(Palette.orange)
+
             Text(title)
-                .font(.system(.headline, design: .serif))
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(Palette.ink)
+
             Text(message)
-                .font(.subheadline)
+                .font(.system(size: 15))
+                .foregroundStyle(Palette.muted)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 42)
+        .padding(.horizontal, 20)
+        .background(
+            Palette.paper,
+            in: RoundedRectangle(cornerRadius: 22)
+        )
+    }
+}
+
+#Preview {
+    RecipeHome()
+}
